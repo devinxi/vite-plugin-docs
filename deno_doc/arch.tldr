@@ -1,0 +1,122 @@
+{
+  "document": {
+    "id": "doc",
+    "name": "New Document",
+    "version": 15.3,
+    "pages": {
+      "page": {
+        "id": "page",
+        "name": "Page 1",
+        "childIndex": 1,
+        "shapes": {
+          "e84101ef-2398-495a-1241-ed8fdecaf871": {
+            "id": "e84101ef-2398-495a-1241-ed8fdecaf871",
+            "type": "text",
+            "name": "Text",
+            "parentId": "page",
+            "childIndex": 1,
+            "point": [
+              -183.98,
+              94.02
+            ],
+            "rotation": 0,
+            "text": "vite-plugin-docs\n/__docs/solid-js should show the API from node modules.. deno-doc bundle for node using esbuild ",
+            "style": {
+              "color": "black",
+              "size": "small",
+              "isFilled": false,
+              "dash": "draw",
+              "scale": 1,
+              "font": "script",
+              "textAlign": "middle"
+            }
+          },
+          "4d4daa7a-ec8e-4526-148e-3fa1f8f0361a": {
+            "id": "4d4daa7a-ec8e-4526-148e-3fa1f8f0361a",
+            "type": "text",
+            "name": "Text",
+            "parentId": "page",
+            "childIndex": 2,
+            "point": [
+              -144.89,
+              228.78
+            ],
+            "rotation": 0,
+            "text": "- bundle deno docs with deno bundle, gives single ESM with top-level await\n- wrap this is an async function that takes Deno as input\n- try in vite\n\n\n\n- try ossos",
+            "style": {
+              "color": "black",
+              "size": "small",
+              "isFilled": false,
+              "dash": "draw",
+              "scale": 1,
+              "font": "script",
+              "textAlign": "start"
+            }
+          },
+          "89573262-27d3-4f10-2c53-2f3f52d89b5a": {
+            "id": "89573262-27d3-4f10-2c53-2f3f52d89b5a",
+            "type": "text",
+            "name": "Text",
+            "parentId": "page",
+            "childIndex": 3,
+            "point": [
+              270.95,
+              299.41
+            ],
+            "rotation": 0,
+            "text": " ",
+            "style": {
+              "color": "black",
+              "size": "small",
+              "isFilled": false,
+              "dash": "draw",
+              "scale": 1,
+              "font": "script",
+              "textAlign": "middle"
+            }
+          },
+          "d8222bc2-9fc0-4ba2-341e-ef4276171ebb": {
+            "id": "d8222bc2-9fc0-4ba2-341e-ef4276171ebb",
+            "type": "text",
+            "name": "Text",
+            "parentId": "page",
+            "childIndex": 4,
+            "point": [
+              201.63,
+              217.16000000000003
+            ],
+            "rotation": 0,
+            "text": " ",
+            "style": {
+              "color": "black",
+              "size": "small",
+              "isFilled": false,
+              "dash": "draw",
+              "scale": 1,
+              "font": "script",
+              "textAlign": "middle"
+            }
+          }
+        },
+        "bindings": {}
+      }
+    },
+    "pageStates": {
+      "page": {
+        "id": "page",
+        "selectedIds": [
+          "e84101ef-2398-495a-1241-ed8fdecaf871"
+        ],
+        "camera": {
+          "point": [
+            0,
+            0
+          ],
+          "zoom": 1
+        }
+      }
+    },
+    "assets": {}
+  },
+  "assets": {}
+}

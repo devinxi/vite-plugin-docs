@@ -1,87 +1,76 @@
-import { resolve } from 'path'
-import { join } from 'path/posix'
-import { defineConfig } from 'vite'
-import Vue from '@vitejs/plugin-vue'
-import Pages from 'vite-plugin-pages'
-import Icons from 'unplugin-icons/vite'
-import IconsResolver from 'unplugin-icons/resolver'
-import Components from 'unplugin-vue-components/vite'
-import AutoImport from 'unplugin-auto-import/vite'
-import WindiCSS from 'vite-plugin-windicss'
-import OptimizationPersist from 'vite-plugin-optimize-persist'
-import PkgConfig from 'vite-plugin-package-config'
-import Inspect from '../node'
-
+import { resolve } from "path";
+import { join } from "path/posix";
+import { defineConfig } from "vite";
+import Vue from "@vitejs/plugin-vue";
+import Pages from "vite-plugin-pages";
+import Icons from "unplugin-icons/vite";
+// import IconsResolver from "unplugin-icons/resolver";
+// import Components from "unplugin-vue-components/vite";
+import AutoImport from "unplugin-auto-import/vite";
+import WindiCSS from "vite-plugin-windicss";
+import OptimizationPersist from "vite-plugin-optimize-persist";
+import PkgConfig from "vite-plugin-package-config";
+import Docs from "../node";
+import Solid from "@vinxi/vite-preset-solid/solid";
 export default defineConfig({
-  base: '/__inspect/',
+  base: "/__docs/",
 
   resolve: {
     alias: {
-      '~/': __dirname,
-    },
+      "~/": __dirname
+    }
   },
 
   plugins: [
     Vue(),
     Pages({
-      pagesDir: 'pages',
+      pagesDir: "pages"
     }),
-    Components({
-      dirs: [
-        'components',
-      ],
-      dts: join(__dirname, 'components.d.ts'),
-      resolvers: [
-        IconsResolver({
-          componentPrefix: '',
-        }),
-      ],
-    }),
-    Icons(),
+    Solid(),
+    // vanillaExtractPlugin(),
+    // icons({ compiler: "solid" }),
+    // Components({
+    //   dirs: ["components"],
+    //   dts: join(__dirname, "components.d.ts"),
+    //   resolvers: [
+    //     IconsResolver({
+    //       componentPrefix: ""
+    //     })
+    //   ]
+    // }),
+    Icons({ compiler: "solid" }),
     WindiCSS({
       scan: {
-        dirs: [
-          __dirname,
-        ],
-      },
+        dirs: [__dirname]
+      }
     }),
-    Inspect({
+    Docs({
       // include: /\.vue$/,
     }),
     PkgConfig({
-      packageJsonPath: 'vite.config.json',
+      packageJsonPath: "vite.config.json"
     }),
     OptimizationPersist(),
     AutoImport({
-      dts: join(__dirname, 'auto-imports.d.ts'),
-      imports: [
-        'vue',
-        'vue-router',
-        '@vueuse/core',
-      ],
-    }),
+      dts: join(__dirname, "auto-imports.d.ts"),
+      imports: ["vue", "vue-router", "@vueuse/core"]
+    })
   ],
 
   server: {
     fs: {
-      strict: true,
-    },
+      strict: true
+    }
   },
 
   build: {
-    outDir: resolve(__dirname, '../../dist/client'),
-    minify: true,
-    emptyOutDir: true,
+    outDir: resolve(__dirname, "../../dist/client"),
+    minify: false,
+    emptyOutDir: true
   },
 
   optimizeDeps: {
-    include: [
-      'vue',
-      'vue-router',
-      '@vueuse/core',
-    ],
-    exclude: [
-      'vue-demi',
-    ],
-  },
-})
+    include: ["vue", "vue-router", "@vueuse/core"],
+    exclude: ["vue-demi"]
+  }
+});

@@ -1,20 +1,52 @@
-import { fileURLToPath } from 'url'
-import { dirname, resolve } from 'path'
-import _debug from 'debug'
-import { yellow } from 'kolorist'
-import type { ModuleNode, Plugin, ResolvedConfig, ViteDevServer } from 'vite'
-import sirv from 'sirv'
-import { parseQuery, parseURL } from 'ufo'
-import { createFilter } from '@rollup/pluginutils'
-import type { ModuleInfo, TransformInfo } from '../types'
+import { fileURLToPath } from "url";
+import { dirname, resolve as pathResolve } from "path";
+import _debug from "debug";
+import { yellow } from "kolorist";
+import type { ModuleNode, Plugin, ResolvedConfig, ViteDevServer } from "vite";
+import sirv from "sirv";
+import { parseURL } from "ufo";
+import getDoc from "./docs-wrapped";
+const debug = _debug("vite-plugin-docs");
 
-const debug = _debug('vite-plugin-inspect')
+import fs from "fs";
+import path from "path";
+import resolve from "resolve";
 
-const _dirname = typeof __dirname !== 'undefined'
-  ? __dirname
-  : dirname(fileURLToPath(import.meta.url))
+function resolvePackage(specifier, referrer) {
+  try {
+    const resolved = resolve.sync(specifier, {
+      basedir: path.dirname(new URL(referrer).pathname),
+      packageFilter: (pkg, _pkgPath) => {
+        if (pkg.types?.length) {
+          pkg.main = pkg.types;
+        }
+        return pkg;
+      },
+      extensions: [".ts", ".tsx", ".d.ts"]
+    });
+    console.log(resolved);
+    return "file://" + resolved;
+  } catch (e) {
+    return null;
+  }
+}
 
-export type FilterPattern = ReadonlyArray<string | RegExp> | string | RegExp | null
+async function getDocs(doc, url) {
+  try {
+    let result = await doc(url, {
+      resolve: resolveFn
+    });
+
+    return result;
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+const _dirname =
+  typeof __dirname !== "undefined" ? __dirname : dirname(fileURLToPath(import.meta.url));
+
+export type FilterPattern = ReadonlyArray<string | RegExp> | string | RegExp | null;
 
 export interface Options {
   /**
@@ -22,200 +54,136 @@ export interface Options {
    *
    * @default true
    */
-  enabled?: boolean
+  enabled?: boolean;
 
   /**
    * Filter for modules to be inspected
    */
-  include?: FilterPattern
+  include?: FilterPattern;
   /**
    * Filter for modules to not be inspected
    */
-  exclude?: FilterPattern
+  exclude?: FilterPattern;
+}
+
+function resolveFn(specifier, referrer) {
+  if (specifier.startsWith(".") || specifier.startsWith("/")) {
+    if (!specifier.endsWith(".ts") && !specifier.endsWith(".tsx")) {
+      for (const p of [
+        specifier + ".ts",
+        specifier + ".tsx",
+        specifier + ".d.ts",
+        specifier + "/index.ts",
+        specifier + "/index.tsx",
+        specifier + "/index.d.ts"
+      ]) {
+        console.log(`resolve ${p} ${path.dirname(new URL(referrer).pathname)}`);
+        let p1 = path.dirname(new URL(referrer).pathname);
+        fs.existsSync(path.join(p1, p));
+        if (fs.existsSync(path.join(p1, p))) {
+          let resolved = path.join(path.dirname(referrer), p);
+          return resolved;
+        }
+      }
+    }
+  } else {
+    return resolvePackage(specifier, referrer);
+  }
 }
 
 function PluginInspect(options: Options = {}): Plugin {
-  const {
-    enabled = true,
-  } = options
+  const { enabled = true } = options;
 
   if (!enabled) {
     return {
-      name: 'vite-plugin-inspect',
-    }
+      name: "vite-plugin-docs"
+    } as any;
   }
 
-  const filter = createFilter(options.include, options.exclude)
+  // const filter = createFilter(options.include, options.exclude);
+  let config: ResolvedConfig;
 
-  let config: ResolvedConfig
+  async function configureServer(server: ViteDevServer) {
+    server.middlewares.use(
+      "/__docs",
+      sirv(pathResolve(_dirname, "../../dist/client"), {
+        single: true,
+        dev: true
+      })
+    );
 
-  const transformMap: Record<string, TransformInfo[]> = {}
-  const idMap: Record<string, string> = {}
+    const doc = await getDoc({}, (await import("node-fetch")).default);
 
-  function hijackPlugin(plugin: Plugin) {
-    if (plugin.transform) {
-      debug('hijack plugin transform', plugin.name)
-      const _transform = plugin.transform
-      plugin.transform = async function(this: any, ...args: any[]) {
-        const code = args[0]
-        const id = args[1]
-        const start = Date.now()
-        const _result = await _transform.apply(this, args as any)
-        const end = Date.now()
+    server.middlewares.use("/__docs_api", async (req, res) => {
+      const { pathname, search } = parseURL(req.url);
+      console.log(pathname, resolveFn("." + pathname, "file://" + process.cwd() + "/index.js"));
+      let id = resolveFn("." + pathname, "file://" + process.cwd() + "/index.js");
 
-        const result = typeof _result === 'string' ? _result : _result?.code
-
-        if (filter(id) && result != null) {
-          // the last plugin must be `vite:import-analysis`, if it's already there, we reset the stack
-          if (transformMap[id] && transformMap[id].slice(-1)[0]?.name === 'vite:import-analysis')
-            delete transformMap[id]
-          // initial tranform (load from fs), add a dummy
-          if (!transformMap[id])
-            transformMap[id] = [{ name: '__load__', result: code, start, end: start }]
-          // record transform
-          transformMap[id].push({ name: plugin.name, result, start, end })
+      console.log("resolved", id);
+      if (id) {
+        let result = await getDocs(doc, id);
+        if (result) {
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify(result));
+          return;
         }
-
-        return _result
       }
-    }
+      res.write(JSON.stringify({ error: "Module Not Found", path: req.url }));
+      res.end();
+    });
 
-    if (plugin.load) {
-      debug('hijack plugin load', plugin.name)
-      const _load = plugin.load
-      plugin.load = async function(this: any, ...args: any[]) {
-        const id = args[0]
-        const start = Date.now()
-        const _result = await _load.apply(this, args as any)
-        const end = Date.now()
-
-        const result = typeof _result === 'string' ? _result : _result?.code
-
-        if (filter(id) && result != null)
-          transformMap[id] = [{ name: plugin.name, result, start, end }]
-
-        return _result
+    server.middlewares.use("/__package", async (req, res) => {
+      let result = fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8");
+      if (result) {
+        res.setHeader("Content-Type", "application/json");
+        res.end(result);
+        return;
       }
-    }
+      res.write(JSON.stringify({ error: "Module Not Found", path: req.url }));
+      res.end();
+    });
 
-    if (plugin.resolveId) {
-      debug('hijack plugin resolveId', plugin.name)
-      const _resolveId = plugin.resolveId
-      plugin.resolveId = async function(this: any, ...args: any[]) {
-        const id = args[0]
-        const _result = await _resolveId.apply(this, args as any)
+    server.middlewares.use("/__docs_package", async (req, res) => {
+      const { pathname, search } = parseURL(req.url);
+      console.log(pathname.slice(1), "file://" + process.cwd() + "/index.js");
+      const id = resolvePackage(pathname.slice(1), "file://" + process.cwd() + "/index.js");
 
-        const result = typeof _result === 'object' ? _result?.id : _result
-
-        if (!id.startsWith('./') && result && result !== id)
-          idMap[id] = result
-
-        return _result
+      if (!id) {
+        res.write(JSON.stringify({ error: "Module Not Found", path: req.url }));
+        res.end();
+        return;
       }
-    }
-  }
-
-  function resolveId(id = ''): string {
-    if (id.startsWith('./'))
-      id = resolve(config.root, id).replace(/\\/g, '/')
-    return resolveIdRec(id)
-  }
-
-  function resolveIdRec(id: string): string {
-    return idMap[id]
-      ? resolveIdRec(idMap[id])
-      : id
-  }
-
-  function getIdInfo(id: string) {
-    const resolvedId = resolveId(id)
-
-    return {
-      resolvedId,
-      transforms: transformMap[resolvedId] || [],
-    }
-  }
-
-  function configureServer(server: ViteDevServer) {
-    const _invalidateModule = server.moduleGraph.invalidateModule
-    server.moduleGraph.invalidateModule = function(this: any, ...args: any) {
-      const mod = args[0] as ModuleNode
-      if (mod?.id)
-        delete transformMap[mod.id]
-      return _invalidateModule.apply(this, args)
-    }
-
-    server.middlewares.use('/__inspect', sirv(resolve(_dirname, '../dist/client'), {
-      single: true,
-      dev: true,
-    }))
-
-    server.middlewares.use('/__inspect_api', (req, res) => {
-      const { pathname, search } = parseURL(req.url)
-
-      if (pathname === '/list') {
-        const modules = Object.keys(transformMap).sort()
-          .map((id): ModuleInfo => {
-            const plugins = transformMap[id]?.map(i => i.name)
-            const deps = Array.from(server.moduleGraph.getModuleById(id)?.importedModules || [])
-              .map(i => i.id || '')
-              .filter(Boolean)
-
-            return {
-              id,
-              plugins,
-              deps,
-              virtual: plugins[0] !== '__load__',
-            }
-          })
-
-        res.write(JSON.stringify({
-          root: config.root,
-          modules,
-        }, null, 2))
-        res.end()
-      }
-      else if (pathname === '/module') {
-        const id = parseQuery(search).id as string
-        res.write(JSON.stringify(getIdInfo(id), null, 2))
-        res.end()
-      }
-      else if (pathname === '/resolve') {
-        const id = parseQuery(search).id as string
-        res.write(JSON.stringify({ id: resolveId(id) }, null, 2))
-        res.end()
-      }
-      else if (pathname === '/clear') {
-        const id = resolveId(parseQuery(search).id as string)
-        if (id) {
-          const mod = server.moduleGraph.getModuleById(id)
-          if (mod)
-            server.moduleGraph.invalidateModule(mod)
-          delete transformMap[id]
+      try {
+        let result = await getDocs(doc, id);
+        if (result) {
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify(result));
+          return;
         }
-        res.end()
+      } catch (e) {
+        res.write(req.url);
+        res.end();
       }
-    })
+    });
 
-    server.httpServer?.once('listening', () => {
-      const protocol = config.server.https ? 'https' : 'http'
-      const port = config.server.port
+    server.httpServer?.once("listening", () => {
+      const protocol = config.server.https ? "https" : "http";
+      const port = config.server.port;
       setTimeout(() => {
         // eslint-disable-next-line no-console
-        console.log(`  > Inspect: ${yellow(`${protocol}://localhost:${port}/__inspect/`)}\n`)
-      }, 0)
-    })
+        console.log(`  > Docs: ${yellow(`${protocol}://localhost:${port}/__docs/`)}\n`);
+      }, 0);
+    });
   }
 
   return <Plugin>{
-    name: 'vite-plugin-inspect',
-    apply: 'serve',
+    name: "vite-plugin-docs",
+    apply: "serve",
     configResolved(_config) {
-      config = _config
-      config.plugins.forEach(hijackPlugin)
+      config = _config;
     },
-    configureServer,
-  }
+    configureServer
+  };
 }
 
-export default PluginInspect
+export default PluginInspect;

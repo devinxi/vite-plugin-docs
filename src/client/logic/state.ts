@@ -1,6 +1,6 @@
 import { createEventHook, useFetch, useStorage } from '@vueuse/core'
 import { computed, reactive } from 'vue'
-import type { ModuleInfo } from '../../types'
+import type { ModuleInfo } from '../../../types'
 
 export const onRefetch = createEventHook<void>()
 export const enableDiff = useStorage('vite-inspect-diff', true)

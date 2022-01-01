@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Network, Data, Options } from 'vis-network'
-import type { ModuleInfo } from '../../types'
+import type { ModuleInfo } from '../../../types'
 import { isDark } from '../logic'
 
 const props = defineProps<{
